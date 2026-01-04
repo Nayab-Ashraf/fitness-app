@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'profile.dart'; // <--- Import Profile Screen to navigate there
+import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
+
+// --- IMPORTS ---
+import 'sign_in.dart'; // Navigate back to Login after sending email
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -10,62 +13,80 @@ class ForgotPasswordScreen extends StatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  // --- Controllers to capture user input ---
-  final TextEditingController _passController = TextEditingController();
-  final TextEditingController _confirmController = TextEditingController();
+  // --- Controller for Email ---
+  final TextEditingController _emailController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
-    _passController.dispose();
-    _confirmController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
-  void _handleChangePassword() {
-    String password = _passController.text.trim();
-    String confirm = _confirmController.text.trim();
+  // --- LOGIC: Send Reset Email ---
+  Future<void> _handleSendResetEmail() async {
+    String email = _emailController.text.trim();
 
-    // 1. Validation: Check if fields are empty
-    if (password.isEmpty || confirm.isEmpty) {
+    // 1. Validation
+    if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please enter and confirm your new password"),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text("Please enter your email address"), backgroundColor: Colors.orange),
       );
       return;
     }
 
-    // 2. Validation: Check if passwords match (Optional but good practice)
-    if (password != confirm) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Passwords do not match"),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+    setState(() {
+      _isLoading = true;
+    });
 
-    // 3. Success: Show message and Navigate
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Password changed successfully!"),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ),
-    );
+    try {
+      // 2. Send Reset Link via Firebase
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
 
-    // Wait 1 second so user sees the green message, then go to Profile
-    Future.delayed(const Duration(seconds: 1), () {
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
+        // 3. Success Message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Reset link sent! Please check your email."),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+
+        // 4. Navigate back to Sign In Screen
+        // We go to Sign In because they need to login with the new password
+        Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              (route) => false, // Clears the back history so they can't go back to 'Forgot Password'
+          MaterialPageRoute(builder: (context) => const SignInScreen()),
         );
       }
-    });
+    } on FirebaseAuthException catch (e) {
+      // Handle Errors (e.g., User not found, invalid email)
+      String message = "Error sending email.";
+      if (e.code == 'user-not-found') {
+        message = "No account found with this email.";
+      } else if (e.code == 'invalid-email') {
+        message = "Please enter a valid email address.";
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -75,7 +96,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Padding(
+            padding: const EdgeInsets.all(15.0),
+            child: Image.asset('assets/images/back_icon.png', fit: BoxFit.contain),
+          ),
+        ),
         systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.light,
@@ -96,9 +123,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 10),
+                const SizedBox(height: 20),
 
-                // --- Main Heading ---
+                // --- Heading ---
                 const Text(
                   'Forgot Password?',
                   style: TextStyle(
@@ -110,27 +137,28 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
                 const SizedBox(height: 40),
 
-                // --- Subtitle Row with Key Icon ---
+                // --- Subtitle & Icon ---
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Set a new password',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
+                    const Expanded(
+                      child: Text(
+                        'Enter your email to receive a reset link',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     Container(
                       height: 50,
                       width: 50,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                      ),
+                      margin: const EdgeInsets.only(left: 10),
                       child: Image.asset(
-                        'assets/images/key_logo.png',
+                        'assets/images/key_logo.png', // Make sure you have this or use an Icon
                         fit: BoxFit.contain,
+                        errorBuilder: (c,o,s) => const Icon(Icons.lock_reset, size: 40, color: Colors.cyan),
                       ),
                     ),
                   ],
@@ -139,7 +167,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 const SizedBox(height: 10),
 
                 const Text(
-                  'password must contains special\ncharacters and numbers',
+                  'We will send you an email with a link to create a new password.',
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 14,
@@ -147,37 +175,45 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 50),
 
-                // --- Input 1: Create New Password ---
+                // --- Email Input ---
                 const Text(
-                  'Create New Password',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                  ),
+                  'Email Address',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
                 ),
                 const SizedBox(height: 10),
-                _buildPasswordInput(_passController), // Uses helper widget below
 
-                const SizedBox(height: 25),
-
-                // --- Input 2: Confirm Password ---
-                const Text(
-                  'Confirm Password',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
+                // Helper Widget for Input
+                Container(
+                  width: double.infinity,
+                  height: 55,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: Center(
+                    child: TextField(
+                      controller: _emailController,
+                      style: const TextStyle(color: Colors.white),
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        hintText: "example@email.com",
+                        hintStyle: TextStyle(color: Colors.white38),
+                        icon: Icon(Icons.email_outlined, color: Colors.white70),
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 10),
-                _buildPasswordInput(_confirmController), // Uses helper widget below
 
                 const SizedBox(height: 50),
 
-                // --- "Change Password" Button ---
+                // --- Send Button ---
                 GestureDetector(
-                  onTap: _handleChangePassword, // Calls the logic we wrote above
+                  onTap: _isLoading ? null : _handleSendResetEmail,
                   child: Container(
                     width: double.infinity,
                     height: 60,
@@ -189,15 +225,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       borderRadius: BorderRadius.circular(30),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.blue.withValues(alpha: 0.3),
+                          color: Colors.blue.withOpacity(0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 5),
                         )
                       ],
                     ),
                     alignment: Alignment.center,
-                    child: const Text(
-                      'Change password',
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                      'Send Reset Link',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -210,33 +248,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 const SizedBox(height: 20),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // --- Helper Widget to avoid repeating code for the text boxes ---
-  Widget _buildPasswordInput(TextEditingController controller) {
-    return Container(
-      width: double.infinity,
-      height: 55,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: const BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage('assets/images/grey_buttion.png'),
-          fit: BoxFit.fill,
-        ),
-      ),
-      child: Center(
-        child: TextField(
-          controller: controller, // Connects the controller
-          obscureText: true,
-          style: const TextStyle(color: Colors.black87),
-          decoration: const InputDecoration(
-            border: InputBorder.none,
-            contentPadding: EdgeInsets.zero,
-            isDense: true,
           ),
         ),
       ),

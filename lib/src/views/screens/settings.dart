@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 // --- ACTIVE IMPORTS ---
+import 'change_password.dart';
 import 'dashboard.dart';
 import 'profile.dart';
 import 'schedule.dart';
@@ -39,12 +40,13 @@ class SettingsScreen extends StatelessWidget {
       {
         'title': 'Change Password',
         'icon': Icons.lock_outline,
+        // OLD CODE (Might be ForgotPasswordScreen)
         'screen': const ForgotPasswordScreen(),
       },
       {
         'title': 'Add an Account',
         'icon': Icons.person_add_alt,
-        'screen': const CreateAccountScreen(),
+        'screen': const SignUpScreen(),
       },
       {
         'title': 'Rate Us',

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart'; // <--- This fixes the "Firebase" error
-import 'splash_screen.dart'; // <--- This fixes the "SplashScreen" error
+import 'src/views/screens/splash_screen.dart'; // <--- This fixes the "SplashScreen" error
 
 void main() async {
   // 1. Initialize the binding

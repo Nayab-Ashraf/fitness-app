@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // <--- 1. Import Firebase Auth
+import 'package:firebase_auth/firebase_auth.dart';
 
-// Import your screens
+// --- IMPORTS ---
 import 'forgot_password.dart';
 import 'sign_up.dart';
-import 'dashboard.dart'; // <--- We usually go to Dashboard after login, not Profile
+import 'dashboard.dart';
+import 'verify_email.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -19,15 +20,14 @@ class _SignInScreenState extends State<SignInScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  // Loading State (to show spinner while logging in)
+  // State Variables
   bool _isLoading = false;
+  bool _isPasswordVisible = false;
 
-  // --- REAL FIREBASE LOGIN FUNCTION ---
+  // --- LOGIN LOGIC ---
   Future<void> loginUser() async {
-    // 1. dismiss keyboard
     FocusScope.of(context).unfocus();
 
-    // 2. Validate empty fields locally first to save time
     if (_emailController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter both email and password'), backgroundColor: Colors.orange),
@@ -35,47 +35,57 @@ class _SignInScreenState extends State<SignInScreen> {
       return;
     }
 
-    // 3. Start Loading
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // 4. Attempt Sign In with Firebase
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // 5. If successful, go to Dashboard
-      if (mounted) {
-        // We use pushReplacement so the user can't go back to Login by pressing back button
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const DashboardScreen()),
-        );
+      if (userCredential.user != null) {
+        if (!userCredential.user!.emailVerified) {
+          if (mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const VerifyEmailScreen()),
+            );
+          }
+        } else {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const DashboardScreen()),
+            );
+          }
+        }
       }
 
     } on FirebaseAuthException catch (e) {
-      // 6. Handle Errors (Wrong password, User not found, etc.)
-      String message = "An error occurred";
-      if (e.code == 'user-not-found') {
-        message = "No user found for that email.";
-      } else if (e.code == 'wrong-password') {
-        message = "Wrong password provided.";
-      } else if (e.code == 'invalid-email') {
-        message = "The email address is badly formatted.";
-      } else if (e.code == 'invalid-credential') {
-        message = "Invalid email or password.";
-      }
+      // --- FIX: Show the REAL error message from Firebase ---
+      String message = e.message ?? "An error occurred";
+
+      // Optional: Make common errors friendlier
+      if (e.code == 'user-not-found') message = "No user found for that email.";
+      else if (e.code == 'wrong-password') message = "Wrong password provided.";
+      else if (e.code == 'invalid-credential') message = "Invalid email or password.";
+      else if (e.code == 'network-request-failed') message = "Network Error. Check your internet connection.";
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message), backgroundColor: Colors.red),
         );
       }
+    } catch (e) {
+      // Handle non-Firebase errors
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        );
+      }
     } finally {
-      // 7. Stop Loading
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -123,19 +133,12 @@ class _SignInScreenState extends State<SignInScreen> {
 
                 const Text(
                   'Hello there,',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(color: Colors.white, fontSize: 16),
                 ),
                 const SizedBox(height: 5),
                 const Text(
                   'Welcome Back',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
                 ),
 
                 const SizedBox(height: 50),
@@ -169,7 +172,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
                 const SizedBox(height: 20),
 
-                // --- Password Input ---
+                // --- Password Input (With Eye Icon) ---
                 Container(
                   width: double.infinity,
                   height: 55,
@@ -183,15 +186,26 @@ class _SignInScreenState extends State<SignInScreen> {
                   child: Center(
                     child: TextField(
                       controller: _passwordController,
-                      obscureText: true,
+                      obscureText: !_isPasswordVisible,
                       style: const TextStyle(color: Colors.black87),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Password',
-                        hintStyle: TextStyle(color: Colors.black38),
+                        hintStyle: const TextStyle(color: Colors.black38),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.zero,
                         isDense: true,
-                        icon: Icon(Icons.lock_outline, color: Colors.black54),
+                        icon: const Icon(Icons.lock_outline, color: Colors.black54),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                            color: Colors.black54,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _isPasswordVisible = !_isPasswordVisible;
+                            });
+                          },
+                        ),
                       ),
                     ),
                   ),
@@ -199,7 +213,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
                 const SizedBox(height: 15),
 
-                // --- FORGOT PASSWORD LINK ---
+                // --- FORGOT PASSWORD ---
                 Align(
                   alignment: Alignment.centerRight,
                   child: GestureDetector(
@@ -223,9 +237,9 @@ class _SignInScreenState extends State<SignInScreen> {
 
                 const SizedBox(height: 40),
 
-                // --- SIGN IN BUTTON (With Loading Spinner) ---
+                // --- SIGN IN BUTTON ---
                 GestureDetector(
-                  onTap: _isLoading ? null : loginUser, // Disable click if loading
+                  onTap: _isLoading ? null : loginUser,
                   child: Container(
                     width: double.infinity,
                     height: 60,
@@ -244,7 +258,6 @@ class _SignInScreenState extends State<SignInScreen> {
                       ],
                     ),
                     alignment: Alignment.center,
-                    // If loading, show spinner. If not, show text.
                     child: _isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
                         : const Text(
@@ -272,7 +285,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const SignUpScreen()), // Changed from SignUpScreen to CreateAccountScreen based on your code
+                          MaterialPageRoute(builder: (context) => const SignUpScreen()),
                         );
                       },
                       child: const Text(
@@ -288,7 +301,6 @@ class _SignInScreenState extends State<SignInScreen> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 20),
               ],
             ),

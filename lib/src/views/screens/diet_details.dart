@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class DietDetailsScreen extends StatefulWidget {
-  final String planName; // e.g., "BEGINNER"
+  // If no plan name is passed, we default to "Beginner"
+  final String planName;
 
-  const DietDetailsScreen({super.key, required this.planName});
+  const DietDetailsScreen({super.key, this.planName = "BEGINNER"});
 
   @override
   State<DietDetailsScreen> createState() => _DietDetailsScreenState();
@@ -46,11 +47,15 @@ class _DietDetailsScreenState extends State<DietDetailsScreen> {
   void initState() {
     super.initState();
     // 1. Load the correct list
-    String key = widget.planName.toUpperCase().split(":")[0]; // "BEGINNER" from "BEGINNER: DETOX"
-    // Default to beginner if key not found
-    if (!_dietData.containsKey(key)) key = "BEGINNER";
+    // This logic handles names like "BEGINNER: DETOX" by taking just the first word
+    String key = widget.planName.toUpperCase().split(":")[0].split(" ")[0];
 
-    currentMeals = _dietData[key]!;
+    // Default to beginner if key not found
+    if (!_dietData.containsKey(key)) {
+      key = "BEGINNER";
+    }
+
+    currentMeals = List.from(_dietData[key]!); // Create a copy so we can toggle checkboxes
 
     // 2. Calculate Total Calories for this plan
     for (var meal in currentMeals) {
@@ -114,6 +119,9 @@ class _DietDetailsScreenState extends State<DietDetailsScreen> {
                 decoration: BoxDecoration(
                   color: const Color(0xFF64C8D6), // Cyan/Teal
                   borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 5))
+                  ],
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -142,13 +150,16 @@ class _DietDetailsScreenState extends State<DietDetailsScreen> {
                           height: 70,
                           width: 70,
                           child: CircularProgressIndicator(
-                            value: _consumedCalories / _totalCalories,
+                            value: _totalCalories == 0 ? 0 : _consumedCalories / _totalCalories,
                             color: Colors.white,
                             backgroundColor: Colors.black12,
                             strokeWidth: 6,
                           ),
                         ),
-                        Image.asset('assets/images/nutrition icon.png', height: 35, width: 35),
+                        // WARNING: Make sure this image name matches exactly!
+                        // If it fails, try 'assets/images/nutrition_icon.png' (underscore instead of space)
+                        Image.asset('assets/images/nutrition_icon.png', height: 30, width: 30,
+                            errorBuilder: (c,o,s) => const Icon(Icons.local_dining, color: Colors.white)),
                       ],
                     )
                   ],
@@ -167,18 +178,26 @@ class _DietDetailsScreenState extends State<DietDetailsScreen> {
                     return Container(
                       margin: const EdgeInsets.only(bottom: 15),
                       decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.9), // Fallback if image fails
                         image: const DecorationImage(
-                          image: AssetImage('assets/images/grey_button.png'), // Using your grey button asset
+                          image: AssetImage('assets/images/grey_button.png'),
                           fit: BoxFit.fill,
                         ),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(15),
                       ),
                       child: ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
                         // Time
-                        leading: Text(
-                          meal['time'],
-                          style: const TextStyle(color: Colors.cyan, fontWeight: FontWeight.bold, fontSize: 12),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.cyan.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            meal['time'],
+                            style: const TextStyle(color: Colors.cyan, fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
                         ),
                         // Food Name
                         title: Text(
@@ -200,6 +219,7 @@ class _DietDetailsScreenState extends State<DietDetailsScreen> {
                           value: isEaten,
                           activeColor: Colors.green,
                           checkColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                           onChanged: (val) => _toggleMeal(index, val),
                         ),
                       ),
@@ -208,7 +228,7 @@ class _DietDetailsScreenState extends State<DietDetailsScreen> {
                 ),
               ),
 
-              // --- 3. SAVE BUTTON ---
+              // --- 3. FINISH BUTTON ---
               Padding(
                 padding: const EdgeInsets.all(20.0),
                 child: GestureDetector(
@@ -223,14 +243,17 @@ class _DietDetailsScreenState extends State<DietDetailsScreen> {
                     height: 60,
                     decoration: BoxDecoration(
                       image: const DecorationImage(
-                        image: AssetImage('assets/images/button.png'), // Your gradient button
+                        image: AssetImage('assets/images/button_gradient_bg.png'), // Use your gradient button
                         fit: BoxFit.fill,
                       ),
                       borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(color: Colors.blue.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5))
+                      ],
                     ),
                     alignment: Alignment.center,
                     child: const Text(
-                      'Finish Day',
+                      'FINISH DAY',
                       style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ),

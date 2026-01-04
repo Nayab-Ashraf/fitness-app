@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+// --- NEW IMPORTS FOR DATABASE ---
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class WorkoutDetailsScreen extends StatefulWidget {
-  final String planName; // e.g., "MORNING", "WEIGHT", "BEGINNER"
+  final String planName;
 
-  const WorkoutDetailsScreen({super.key, required this.planName});
+  const WorkoutDetailsScreen({super.key, this.planName = "MORNING"});
 
   @override
   State<WorkoutDetailsScreen> createState() => _WorkoutDetailsScreenState();
@@ -38,21 +41,35 @@ class _WorkoutDetailsScreenState extends State<WorkoutDetailsScreen> {
     return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
+  // --- NEW: FUNCTION TO SAVE DATA TO FIREBASE ---
+  Future<void> saveProgressToGraph(int caloriesBurned) async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('workouts')
+          .add({
+        'calories': caloriesBurned,
+        'timestamp': FieldValue.serverTimestamp(), // Automatically sets today's date
+      });
+      print("Data saved to Firestore!");
+    }
+  }
+
   // --- DATA MAPPING ---
   final Map<String, List<Map<String, dynamic>>> _workoutData = {
-    // 1. DASHBOARD PLAN: MORNING
     "MORNING": [
       {"name": "Sun Salutation", "sets": "5 mins warm up", "image": "assets/images/exercise.png", "isDone": false},
       {"name": "Downward Dog", "sets": "3 sets x 30 sec", "image": "assets/images/exercise.png", "isDone": false},
       {"name": "Child's Pose", "sets": "3 sets x 1 min", "image": "assets/images/exercise.png", "isDone": false},
     ],
-    // 2. DASHBOARD PLAN: WEIGHT TRAINING
     "WEIGHT": [
       {"name": "Bench Press", "sets": "4 sets x 12 reps", "image": "assets/images/push-up.png", "isDone": false},
       {"name": "Deadlift", "sets": "4 sets x 10 reps", "image": "assets/images/body-weight.png", "isDone": false},
       {"name": "Shoulder Press", "sets": "3 sets x 12 reps", "image": "assets/images/push-up.png", "isDone": false},
     ],
-    // 3. REGULAR PLANS
     "BEGINNER": [
       {"name": "Jumping Jacks", "sets": "3 sets x 30 sec", "image": "assets/images/jumping-jack.png", "isDone": false},
       {"name": "High Knees", "sets": "3 sets x 30 sec", "image": "assets/images/exercise.png", "isDone": false},
@@ -75,16 +92,11 @@ class _WorkoutDetailsScreenState extends State<WorkoutDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    // Logic: Grab the first word of the plan name to find the key
-    // e.g. "MORNING YOGA" -> "MORNING"
-    // e.g. "BEGINNER: CARDIO" -> "BEGINNER"
     String key = widget.planName.toUpperCase().split(" ")[0].replaceAll(":", "");
-
-    // Safety check: If key doesn't exist, default to Beginner
     if (!_workoutData.containsKey(key)) {
       key = "BEGINNER";
     }
-    currentExercises = _workoutData[key]!;
+    currentExercises = List.from(_workoutData[key]!);
   }
 
   @override
@@ -137,7 +149,7 @@ class _WorkoutDetailsScreenState extends State<WorkoutDetailsScreen> {
                 margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF152A45).withValues(alpha: 0.9),
+                  color: const Color(0xFF152A45).withOpacity(0.9),
                   borderRadius: BorderRadius.circular(15),
                   border: Border.all(color: Colors.white24),
                 ),
@@ -193,7 +205,7 @@ class _WorkoutDetailsScreenState extends State<WorkoutDetailsScreen> {
                       margin: const EdgeInsets.only(bottom: 15),
                       decoration: BoxDecoration(
                         image: const DecorationImage(
-                          image: AssetImage('assets/images/grey_buttion.png'),
+                          image: AssetImage('assets/images/grey_button.png'),
                           fit: BoxFit.fill,
                         ),
                         borderRadius: BorderRadius.circular(10),
@@ -207,12 +219,13 @@ class _WorkoutDetailsScreenState extends State<WorkoutDetailsScreen> {
                             height: 50,
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.8),
+                              color: Colors.white.withOpacity(0.8),
                               shape: BoxShape.circle,
                             ),
                             child: Image.asset(
                               exercise["image"],
                               fit: BoxFit.contain,
+                              errorBuilder: (c, o, s) => const Icon(Icons.fitness_center),
                             ),
                           ),
                           title: Text(
@@ -226,7 +239,7 @@ class _WorkoutDetailsScreenState extends State<WorkoutDetailsScreen> {
                           ),
                           subtitle: Text(
                             exercise["sets"],
-                            style: TextStyle(color: Colors.black.withValues(alpha: 0.6)),
+                            style: TextStyle(color: Colors.black.withOpacity(0.6)),
                           ),
                           trailing: Checkbox(
                             value: isDone,
@@ -245,22 +258,31 @@ class _WorkoutDetailsScreenState extends State<WorkoutDetailsScreen> {
                 ),
               ),
 
-              // --- FINISH BUTTON ---
+              // --- UPDATED FINISH BUTTON ---
               Padding(
                 padding: const EdgeInsets.all(20.0),
                 child: GestureDetector(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Workout Saved!"), backgroundColor: Colors.green),
-                    );
-                    Navigator.pop(context);
+                  onTap: () async {
+                    // 1. Calculate Calories (e.g., 5 calories per minute or 200 flat)
+                    int calories = (_seconds > 60) ? (_seconds ~/ 60) * 5 : 200;
+
+                    // 2. Save to Database
+                    await saveProgressToGraph(calories);
+
+                    // 3. Show Success & Close
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Workout Finished! $calories Calories Saved."), backgroundColor: Colors.green),
+                      );
+                      Navigator.pop(context);
+                    }
                   },
                   child: Container(
                     width: double.infinity,
                     height: 60,
                     decoration: BoxDecoration(
                       image: const DecorationImage(
-                        image: AssetImage('assets/images/buuton.png'),
+                        image: AssetImage('assets/images/button_gradient_bg.png'),
                         fit: BoxFit.fill,
                       ),
                       borderRadius: BorderRadius.circular(30),

@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 // --- NAVIGATION IMPORTS ---
 import 'dashboard.dart';
 import 'profile.dart';
 import 'schedule.dart';
 import 'settings.dart';
 import 'notifications.dart';
-import 'diet_details.dart'; // <--- Connects to the new screen
+import 'diet_details.dart'; // <--- Connects to the details screen
 
 class NutritionScreen extends StatelessWidget {
   const NutritionScreen({super.key});
@@ -19,7 +20,6 @@ class NutritionScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        // --- Custom Back Button ---
         leading: GestureDetector(
           onTap: () => Navigator.pop(context),
           child: Padding(
@@ -28,7 +28,6 @@ class NutritionScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          // --- Notification Bell ---
           GestureDetector(
             onTap: () {
               Navigator.push(
@@ -53,19 +52,15 @@ class NutritionScreen extends StatelessWidget {
             ),
           ),
         ],
-        systemOverlayStyle: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-        ),
       ),
       body: Column(
         children: [
-          // --- 1. Custom Blue Header Section ---
+          // --- 1. Header Section ---
           Container(
             width: double.infinity,
             padding: const EdgeInsets.only(top: 100, bottom: 30, left: 20, right: 20),
             decoration: const BoxDecoration(
-              color: Color(0xFF64C8D6), // The Cyan/Light Blue header color
+              color: Color(0xFF64C8D6),
               borderRadius: BorderRadius.only(
                 bottomLeft: Radius.circular(20),
                 bottomRight: Radius.circular(20),
@@ -97,17 +92,20 @@ class NutritionScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                // Big Icon
-                Image.asset(
-                  "assets/images/nutrition icon.png", // Using your specific file name
+                // Icon
+                SizedBox(
                   height: 80,
                   width: 80,
+                  child: Image.asset("assets/images/nutrition icon.png",
+                    fit: BoxFit.contain,
+                    errorBuilder: (c,o,s) => const Icon(Icons.restaurant, size: 60, color: Colors.white),
+                  ),
                 ),
               ],
             ),
           ),
 
-          // --- 2. List of Diet Cards ---
+          // --- 2. Diet Cards ---
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
@@ -115,19 +113,19 @@ class NutritionScreen extends StatelessWidget {
                 children: [
                   _buildDietCard(
                     context,
-                    title: "BEGINNER:",
+                    title: "BEGINNER",
                     subtitle: "WEIGHT LOSS & DETOX",
                   ),
                   const SizedBox(height: 20),
                   _buildDietCard(
                     context,
-                    title: "INTERMEDIATE:",
+                    title: "INTERMEDIATE",
                     subtitle: "BALANCED MACROS",
                   ),
                   const SizedBox(height: 20),
                   _buildDietCard(
                     context,
-                    title: "ADVANCED:",
+                    title: "ADVANCED",
                     subtitle: "HIGH PROTEIN BULK",
                   ),
                 ],
@@ -135,13 +133,10 @@ class NutritionScreen extends StatelessWidget {
             ),
           ),
 
-          // --- 3. Bottom Navigation Bar ---
+          // --- 3. Bottom Navigation ---
           Container(
             height: 80,
-            decoration: const BoxDecoration(
-              color: Color(0xFF0A1E35),
-              border: Border(top: BorderSide(color: Colors.white10)),
-            ),
+            color: const Color(0xFF0A1E35),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -161,11 +156,11 @@ class NutritionScreen extends StatelessWidget {
   Widget _buildDietCard(BuildContext context, {required String title, required String subtitle}) {
     return GestureDetector(
       onTap: () {
-        // Navigate to the Details Screen
+        // FIXED: Changed "DietDetailScreen" to "DietDetailsScreen" (with an 's')
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => DietDetailsScreen(planName: title), // e.g. "BEGINNER:"
+            builder: (context) => DietDetailsScreen(planName: title),
           ),
         );
       },
@@ -173,14 +168,14 @@ class NutritionScreen extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(25),
         decoration: BoxDecoration(
-          color: const Color(0xFF7F8C9A), // Grey-ish blue color
+          color: const Color(0xFF7F8C9A),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              title,
+              "$title:",
               style: const TextStyle(
                 color: Colors.black87,
                 fontSize: 16,
@@ -206,20 +201,15 @@ class NutritionScreen extends StatelessWidget {
   Widget _buildNavItem(BuildContext context, IconData icon, String label, bool isActive) {
     return GestureDetector(
       onTap: () {
-        if (label == "Dashboard") {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const DashboardScreen()));
-        } else if (label == "Your Profile") {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ProfileScreen()));
-        } else if (label == "Setting") {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SettingsScreen()));
-        } else if (label == "Schedule") {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ScheduleScreen()));
-        }
+        if (label == "Dashboard") Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const DashboardScreen()));
+        if (label == "Your Profile") Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ProfileScreen()));
+        if (label == "Setting") Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const SettingsScreen()));
+        if (label == "Schedule") Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ScheduleScreen()));
       },
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 28, color: isActive ? Colors.cyan : Colors.grey),
+          Icon(icon, color: isActive ? Colors.cyan : Colors.grey),
           const SizedBox(height: 5),
           Text(label, style: TextStyle(color: isActive ? Colors.cyan : Colors.grey, fontSize: 12)),
         ],
